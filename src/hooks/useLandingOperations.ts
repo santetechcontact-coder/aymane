@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { publicHealthStructures } from "@/data/public-health-structures";
 import { supabase } from "@/integrations/supabase/client";
 
 export type ServiceStatus = "checking" | "online" | "degraded" | "offline";
@@ -45,11 +46,7 @@ export type LandingOperations = {
 };
 
 export const publicFallbackData = {
-  structures: [
-    { id: "fallback-structure-1", name: "Centre de santé de Grand-Yoff", type: "health_center", city: "Dakar", verified: true },
-    { id: "fallback-structure-2", name: "Clinique communautaire des Almadies", type: "clinic", city: "Dakar", verified: true },
-    { id: "fallback-structure-3", name: "Laboratoire de Pikine", type: "lab", city: "Pikine", verified: true },
-  ],
+  structures: publicHealthStructures.slice(0, 4).map(({ id, name, type, city }) => ({ id, name, type, city, verified: true })),
   medications: [
     { id: "fallback-med-1", name: "Paracétamol 500 mg", price: 850, stock: 42, requires_prescription: false },
     { id: "fallback-med-2", name: "Amoxicilline 1 g", price: 2400, stock: 18, requires_prescription: true },
