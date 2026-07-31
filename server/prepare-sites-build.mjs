@@ -37,7 +37,7 @@ await writeFile(
     main: "index.js",
     no_bundle: true,
     rules: [{ type: "ESModule", globs: ["**/*.js", "**/*.mjs"] }],
-    assets: { directory: "../client" },
+    assets: { directory: "../client", run_worker_first: true },
     observability: { enabled: true },
   })}\n`,
 );
