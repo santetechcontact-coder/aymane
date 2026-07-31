@@ -9,6 +9,7 @@
     "server": "node --env-file-if-exists=.env server/index.mjs",
     "server:test": "node --test server/*.test.mjs",
     "build": "vite build && node server/prepare-sites-build.mjs",
+    "build:vercel": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
