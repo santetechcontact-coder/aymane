@@ -1,0 +1,57 @@
+name: AYMANE CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: TypeScript
+        run: npm exec tsc -- --noEmit
+
+      - name: Frontend tests
+        run: npm run test
+
+      - name: Account backend tests
+        run: npm run server:test
+
+      - name: Production build
+        run: npm run build
+
+      - name: Critical dependency audit
+        run: npm audit --audit-level=critical
+
+  container:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: validate
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build production images
+        env:
+          VITE_SUPABASE_URL: https://example.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: ci-placeholder
+          VITE_SUPABASE_PROJECT_ID: ci
+          AYMANE_IP_HASH_SECRET: ci-only-not-used-at-runtime-000000
+        run: docker compose build

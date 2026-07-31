@@ -1,0 +1,14 @@
+node_modules
+dist
+.git
+.github
+.playwright-mcp
+server/data
+tmp
+output
+*.log
+*.png
+*.pdf
+.env
+.env.*
+!.env.example

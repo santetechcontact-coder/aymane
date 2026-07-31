@@ -1,0 +1,12 @@
+{
+  "name": "aymane-account-api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "better-sqlite3": "12.4.1"
+  }
+}
