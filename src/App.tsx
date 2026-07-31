@@ -49,24 +49,57 @@ const Invoices = lazy(() => import("./pages/Invoices"));
 const Invoice = lazy(() => import("./pages/Invoice"));
 const Pricing = lazy(() => import("./pages/Pricing"));
 const Legal = lazy(() => import("./pages/Legal"));
-const PreviewAccess = lazy(() => import("./pages/PreviewAccess"));
-const InvestorTour = lazy(() => import("./pages/InvestorTour"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
 const queryClient = new QueryClient();
 
 const ScrollToTop = () => {
-  const { pathname, search } = useLocation();
+  const { pathname, search, hash } = useLocation();
 
   useEffect(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
-  }, [pathname, search]);
+    if (!hash) {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      return;
+    }
+
+    const targetId = decodeURIComponent(hash.slice(1));
+    const scrollToTarget = (behavior: ScrollBehavior) => {
+      const target = document.getElementById(targetId);
+      if (!target) return false;
+      target.scrollIntoView({ block: "start", behavior });
+      return true;
+    };
+
+    let settleTimeout: number | undefined;
+    const settlePosition = () => {
+      settleTimeout = window.setTimeout(() => scrollToTarget("auto"), 850);
+    };
+
+    if (scrollToTarget("smooth")) {
+      settlePosition();
+      return () => window.clearTimeout(settleTimeout);
+    }
+
+    const observer = new MutationObserver(() => {
+      if (!scrollToTarget("smooth")) return;
+      observer.disconnect();
+      settlePosition();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    const timeout = window.setTimeout(() => observer.disconnect(), 3000);
+
+    return () => {
+      observer.disconnect();
+      window.clearTimeout(timeout);
+      window.clearTimeout(settleTimeout);
+    };
+  }, [pathname, search, hash]);
 
   return null;
 };
 
 const RouteFallback = () => (
-  <div className="min-h-[100dvh] bg-background px-4 py-24">
+  <div className="app-page-gradient min-h-[100dvh] px-4 py-24">
     <div className="mx-auto max-w-md">
       <div className="h-3 w-24 rounded-full bg-surface-2 animate-pulse" />
       <div className="mt-5 h-10 w-4/5 rounded-[0.75rem] bg-surface-2 animate-pulse" />
@@ -105,11 +138,11 @@ const App = () => (
               <Route path="/cgu" element={<Legal type="terms" />} />
               <Route path="/mentions-legales" element={<Legal type="mentions" />} />
               <Route path="/securite" element={<Legal type="security" />} />
-              <Route path="/investisseurs" element={<InvestorTour />} />
-              <Route path="/vue-mobile" element={<InvestorTour />} />
-              <Route path="/mobile" element={<InvestorTour />} />
-              <Route path="/vue-web" element={<PreviewAccess mode="web" />} />
-              <Route path="/web" element={<PreviewAccess mode="web" />} />
+              <Route path="/investisseurs" element={<Navigate to="/" replace />} />
+              <Route path="/vue-mobile" element={<Navigate to="/" replace />} />
+              <Route path="/mobile" element={<Navigate to="/" replace />} />
+              <Route path="/vue-web" element={<Navigate to="/" replace />} />
+              <Route path="/web" element={<Navigate to="/" replace />} />
               <Route path="/dossier-partage/:token" element={<SharedMedicalRecord />} />
               <Route path="/directory" element={<Directory />} />
               <Route path="/annuaire" element={<Directory />} />

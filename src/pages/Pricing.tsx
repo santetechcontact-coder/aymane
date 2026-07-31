@@ -149,7 +149,7 @@ export default function Pricing() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="app-page-gradient min-h-[100dvh] flex flex-col">
       <Navbar />
       <main id="main-content" className="flex-1 pt-24 pb-20 overflow-hidden">
         <div className="px-5 md:px-8 max-w-6xl mx-auto">

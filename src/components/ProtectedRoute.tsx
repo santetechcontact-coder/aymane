@@ -8,7 +8,7 @@ const ProtectedRoute = ({ children }: { children: ReactNode }) => {
   const location = useLocation();
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center px-5">
+      <div className="app-page-gradient min-h-[100dvh] flex items-center justify-center px-5">
         <div className="rounded-[1.45rem] bg-surface-0 border border-hairline p-6 shadow-sm text-center w-full max-w-xs">
           <img src={logo} alt="AYMANE" className="h-10 w-auto mx-auto object-contain" />
           <div className="mt-5 h-2 rounded-full bg-surface-1 overflow-hidden">

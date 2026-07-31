@@ -13,7 +13,7 @@ const NotFound = () => {
   }, []);
 
   return (
-    <main id="main-content" className="min-h-[100dvh] bg-background px-5 py-8 flex items-center justify-center">
+    <main id="main-content" className="app-page-gradient min-h-[100dvh] px-5 py-8 flex items-center justify-center">
       <section className="w-full max-w-md border-t-2 border-primary bg-surface-0 p-6 shadow-sm">
         <Link to="/" className="inline-flex items-center gap-2 mb-8">
           <img src={logo} alt="AYMANE" className="h-9 w-auto object-contain" />

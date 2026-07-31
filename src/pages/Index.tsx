@@ -4,6 +4,7 @@ import SenegalProductHero from "@/components/SenegalProductHero";
 import LiveOperations from "@/components/LiveOperations";
 import Modules from "@/components/Modules";
 import StakeholderGateway from "@/components/StakeholderGateway";
+import AboutAymane from "@/components/AboutAymane";
 import CTA from "@/components/CTA";
 import Footer from "@/components/Footer";
 import MobileActionDock from "@/components/MobileActionDock";
@@ -21,13 +22,14 @@ const Index = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="app-page-gradient min-h-[100dvh]">
       <Navbar />
       <main id="main-content">
         <SenegalProductHero />
         <LiveOperations />
         <Modules />
         <StakeholderGateway />
+        <AboutAymane />
         <CTA />
       </main>
       <MobileActionDock />

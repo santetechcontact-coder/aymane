@@ -15,9 +15,9 @@ const Navbar = () => {
   const isHome = location.pathname === "/";
 
   const links = [
-    { href: "#produit", label: "Produit" },
-    { href: "#operations", label: "Autour de vous" },
+    { href: "#operations", label: "Services" },
     { href: "#professionnels", label: "Professionnels" },
+    { href: "#a-propos", label: "À propos" },
   ];
 
   useEffect(() => {

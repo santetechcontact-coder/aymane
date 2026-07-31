@@ -243,7 +243,7 @@ const Triage = () => {
   }, [result, mode]);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="app-page-gradient min-h-[100dvh]">
       <Navbar />
 
       <main id="main-content" className="relative pt-24 md:pt-28 pb-20">

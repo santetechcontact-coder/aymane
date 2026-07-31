@@ -14,7 +14,7 @@ const Splash = () => {
   }, [navigate]);
 
   return (
-    <main id="main-content" className="min-h-[100dvh] grid place-items-center bg-background px-6">
+    <main id="main-content" className="app-page-gradient min-h-[100dvh] grid place-items-center px-6">
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}

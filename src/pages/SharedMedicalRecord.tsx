@@ -68,7 +68,7 @@ const SharedMedicalRecord = () => {
   }, [token]);
 
   return (
-    <main id="main-content" className="min-h-[100dvh] bg-background px-4 py-5 text-ink sm:px-6 sm:py-8">
+    <main id="main-content" className="app-page-gradient min-h-[100dvh] px-4 py-5 text-ink sm:px-6 sm:py-8">
       <div className="mx-auto max-w-3xl">
         <header className="flex items-center justify-between gap-4">
           <Link to="/" className="flex items-center gap-2">

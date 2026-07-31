@@ -46,7 +46,7 @@ const Onboarding = () => {
   const Icon = slide.icon;
 
   return (
-    <main id="main-content" className="min-h-[100dvh] bg-background">
+    <main id="main-content" className="app-page-gradient min-h-[100dvh]">
       <header className="px-4 sm:px-6 md:px-8 safe-top">
         <div className="mx-auto max-w-6xl h-16 flex items-center justify-between border-b border-hairline">
           <Link to="/" className="flex items-center gap-2">

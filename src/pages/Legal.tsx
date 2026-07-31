@@ -58,7 +58,7 @@ const Legal = ({ type }: { type: LegalType }) => {
   const Icon = page.icon;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="app-page-gradient min-h-[100dvh]">
       <Navbar />
       <main id="main-content" className="px-5 md:px-8 pt-28 pb-20">
         <div className="mx-auto max-w-3xl">

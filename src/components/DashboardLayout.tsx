@@ -201,7 +201,7 @@ const DashboardLayout = ({
       : primary.slice(0, 5);
 
   return (
-    <div className="min-h-[100dvh] bg-background text-ink lg:grid lg:grid-cols-[252px_minmax(0,1fr)]">
+    <div className="app-page-gradient min-h-[100dvh] text-ink lg:grid lg:grid-cols-[252px_minmax(0,1fr)]">
       <aside className="hidden lg:flex sticky top-0 h-[100dvh] flex-col border-r border-hairline bg-surface-0">
         <Link to="/" className="flex items-center gap-3 px-5 h-20 border-b border-hairline">
           <img src={logo} alt="AYMANE" className="h-9 w-auto object-contain" />

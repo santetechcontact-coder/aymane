@@ -21,7 +21,7 @@ const PublicToolLayout = ({ children, title, mobileAction }: PublicToolLayoutPro
   const { pathname } = useLocation();
 
   return (
-    <div className="min-h-[100dvh] bg-background text-ink">
+    <div className="app-page-gradient min-h-[100dvh] text-ink">
       <header className="sticky top-0 z-30 border-b border-hairline bg-surface-0/94 backdrop-blur-xl safe-top">
         <div className="mx-auto flex h-16 max-w-[1180px] items-center justify-between gap-3 px-4 sm:px-6 md:px-8">
           <div className="flex min-w-0 items-center gap-2">
