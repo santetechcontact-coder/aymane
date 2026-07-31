@@ -1,4 +1,4 @@
-project_id = "vbnizkgzycbewxurkuhl"
+project_id = "tyrovoipgyzuphthcmth"
 
 [functions.symptom-triage]
 verify_jwt = false

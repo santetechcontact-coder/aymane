@@ -21,6 +21,7 @@ output/
 tmp/
 .claude/
 motionsites-prompts/
+supabase/.temp/
 
 # Editor directories and files
 .vscode/*
