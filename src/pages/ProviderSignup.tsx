@@ -4,6 +4,7 @@ import { z } from "zod";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import DocumentUpload from "@/components/DocumentUpload";
 import PhotoUpload from "@/components/PhotoUpload";
 import RoleSpecificFields, { type RoleSpecific } from "@/components/RoleSpecificFields";
@@ -12,12 +13,52 @@ import type { TimeSlot } from "@/components/smart/TimeSlotPicker";
 import { SPECIALTIES, flattenGroups, REGIONS } from "@/lib/medical-data";
 import {
   Check, ArrowLeft, ArrowRight, Stethoscope, Pill,
-  Smile, Heart, Baby, FlaskConical, UserPlus, Hospital,
+  Smile, Heart, Baby, FlaskConical, UserPlus, Hospital, Loader2, MailCheck, RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import AuthShell from "@/components/AuthShell";
 import { friendlyAuthError, syncAccountSession } from "@/lib/account-backend";
 import { securePasswordSchema } from "@/lib/auth-validation";
+
+// Draft persistence — lets a professional resume document upload after
+// confirming their email (when Supabase requires email confirmation, signUp
+// returns no session, so uploads must happen once a session exists). The
+// password is never persisted.
+const DRAFT_KEY = "aymane:provider-draft-v1";
+
+interface ProviderDraft {
+  userId: string;
+  email: string;
+  type: string;
+  structureKind: string;
+  form: Record<string, string>;
+  roleSpecific: unknown;
+  yearsExperience: string;
+  languages: string[];
+  primaryLanguage: string;
+  services: string[];
+  specialties: string[];
+  days: string[];
+  timeSlots: unknown[];
+  structureRole: string;
+}
+
+const readDraft = (): ProviderDraft | null => {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    return raw ? (JSON.parse(raw) as ProviderDraft) : null;
+  } catch {
+    return null;
+  }
+};
+
+const clearDraft = () => {
+  try {
+    localStorage.removeItem(DRAFT_KEY);
+  } catch {
+    /* ignore */
+  }
+};
 
 // --- Types ---
 type ProviderKind =
@@ -71,14 +112,22 @@ const baseStructureSchema = z.object({
 const ProviderSignup = () => {
   const navigate = useNavigate();
   const [params] = useSearchParams();
+  const { session, loading: authLoading } = useAuth();
 
   // Step 0: choose AppType. Step 1: profile + account. Step 2: documents.
   const [step, setStep] = useState<0 | 1 | 2>(0);
   const initialType = (params.get("type") as AppType) || null;
+  const wantsResume = params.get("resume") === "1";
   const [type, setType] = useState<AppType | null>(initialType);
   const [structureKind, setStructureKind] = useState<StructureKind>("clinic");
   const [submitting, setSubmitting] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  // When email confirmation is required, signUp yields no session. We show a
+  // "check your email" panel instead of dead-ending on a broken upload step.
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
+  // While a post-confirmation resume is being resolved, show a spinner rather
+  // than flashing the (stale) first step.
+  const [resolvingResume, setResolvingResume] = useState(wantsResume);
 
   const [form, setForm] = useState({
     // Pro fields
@@ -123,7 +172,72 @@ const ProviderSignup = () => {
     vals.map((v) => specialtyOptions.find((o) => o.value === v)?.label ?? v).join(", ");
 
   useEffect(() => { document.title = "Inscription professionnelle — AYMANE"; }, []);
-  useEffect(() => { if (initialType) setStep(1); }, [initialType]);
+  useEffect(() => { if (initialType && !wantsResume) setStep(1); }, [initialType, wantsResume]);
+
+  // Persist everything except the password so the applicant can resume at the
+  // document step once a session exists (after email confirmation, or after a
+  // page refresh mid-upload).
+  const saveDraft = (id: string) => {
+    const draft: ProviderDraft = {
+      userId: id,
+      email: form.email.trim().toLowerCase(),
+      type: type ?? "",
+      structureKind,
+      form: { ...form, password: "" },
+      roleSpecific,
+      yearsExperience,
+      languages,
+      primaryLanguage,
+      services,
+      specialties,
+      days,
+      timeSlots,
+      structureRole,
+    };
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    } catch {
+      /* ignore quota / privacy-mode failures */
+    }
+  };
+
+  const restoreDraft = (draft: ProviderDraft) => {
+    if (draft.type) setType(draft.type as AppType);
+    if (draft.structureKind) setStructureKind(draft.structureKind as StructureKind);
+    setForm((f) => ({ ...f, ...draft.form, password: "" }));
+    setRoleSpecific((draft.roleSpecific as RoleSpecific) ?? {});
+    setYearsExperience(draft.yearsExperience ?? "");
+    setLanguages(draft.languages ?? []);
+    setPrimaryLanguage(draft.primaryLanguage ?? "");
+    setServices(draft.services ?? []);
+    setSpecialties(draft.specialties ?? []);
+    setDays(draft.days ?? []);
+    setTimeSlots((draft.timeSlots as TimeSlot[]) ?? []);
+    setStructureRole(draft.structureRole ?? "");
+  };
+
+  // Resume after email confirmation: once a session is available and a matching
+  // draft exists, jump straight to the document step with the applicant's data.
+  useEffect(() => {
+    if (authLoading) return;
+    if (userId) { setResolvingResume(false); return; }
+    if (session?.user) {
+      const draft = readDraft();
+      if (draft && draft.userId === session.user.id) {
+        restoreDraft(draft);
+        setUserId(session.user.id);
+        setAwaitingConfirmation(false);
+        setStep(2);
+        setResolvingResume(false);
+        toast({
+          title: "Reprise de votre inscription",
+          description: "Téléversez vos justificatifs pour finaliser votre dossier.",
+        });
+        return;
+      }
+    }
+    setResolvingResume(false);
+  }, [session, authLoading, userId]);
 
   const isStructure = type === "structure";
   const update = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
@@ -137,42 +251,123 @@ const ProviderSignup = () => {
   // ============== Account creation ==============
   const createAccount = async () => {
     if (!type) return;
+
+    // A session may already exist: resumed after email confirmation, or an
+    // existing account continuing as a professional. Then no password is needed.
+    const alreadySignedIn = Boolean(session?.user);
+    const proSchema = alreadySignedIn ? baseProSchema.omit({ password: true }) : baseProSchema;
+    const structureSchema = alreadySignedIn ? baseStructureSchema.omit({ password: true }) : baseStructureSchema;
     try {
-      if (isStructure) baseStructureSchema.parse(form);
-      else baseProSchema.parse(form);
+      if (isStructure) structureSchema.parse(form);
+      else proSchema.parse(form);
     } catch (err: any) {
       toast({ title: "Champs manquants", description: err.errors?.[0]?.message ?? "Vérifiez vos informations", variant: "destructive" });
       return;
     }
 
+    // Already authenticated → skip signUp and go straight to the documents.
+    if (alreadySignedIn && session?.user) {
+      setUserId(session.user.id);
+      saveDraft(session.user.id);
+      setStep(2);
+      return;
+    }
+
     setSubmitting(true);
+    const emailForAuth = form.email.trim().toLowerCase();
     const fullName = isStructure
       ? form.structure_name
       : `${form.first_name} ${form.last_name}`.trim();
 
     const { data, error } = await supabase.auth.signUp({
-      email: form.email.trim().toLowerCase(),
+      email: emailForAuth,
       password: form.password,
       options: {
-        emailRedirectTo: `${window.location.origin}/dashboard`,
+        // After confirmation, land back here so the applicant resumes at the
+        // document step instead of an empty dashboard.
+        emailRedirectTo: `${window.location.origin}/auth/provider?resume=1`,
         data: { full_name: fullName },
       },
     });
-    setSubmitting(false);
     if (error) {
+      setSubmitting(false);
       toast({ title: "Inscription impossible", description: friendlyAuthError(error), variant: "destructive" });
       return;
     }
     if (!data.user) {
+      setSubmitting(false);
       toast({ title: "Erreur", description: "Compte non créé", variant: "destructive" });
       return;
     }
-    if (data.session) {
-      await syncAccountSession(data.session, "signup").catch(() => null);
+
+    // Persist a draft (never the password) so the applicant can resume the
+    // document upload after confirming their email or after a page refresh.
+    saveDraft(data.user.id);
+
+    // Try to obtain a session now. Present when email confirmation is disabled
+    // or the address is already confirmed; absent when confirmation is required.
+    let activeSession = data.session;
+    if (!activeSession) {
+      const { data: signInData } = await supabase.auth.signInWithPassword({
+        email: emailForAuth,
+        password: form.password,
+      });
+      activeSession = signInData.session;
     }
-    setUserId(data.user.id);
+    setSubmitting(false);
+
+    if (activeSession) {
+      await syncAccountSession(activeSession, "signup").catch(() => null);
+      setUserId(activeSession.user.id);
+      setStep(2);
+      toast({ title: "Compte créé", description: "Téléversez maintenant vos pièces justificatives." });
+      return;
+    }
+
+    // No session yet — email confirmation is required. Keep the applicant here
+    // with a clear next step instead of failing every upload under RLS.
+    setAwaitingConfirmation(true);
+    toast({
+      title: "Compte créé — confirmez votre email",
+      description: "Cliquez sur le lien envoyé à votre adresse, puis reprenez le téléversement de vos documents.",
+    });
+  };
+
+  // Called from the confirmation panel: retry sign-in in the same session once
+  // the applicant has clicked the email link (password still in memory).
+  const retryAfterConfirmation = async () => {
+    setSubmitting(true);
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: form.email.trim().toLowerCase(),
+      password: form.password,
+    });
+    setSubmitting(false);
+    if (error || !data.session) {
+      toast({
+        title: "Email pas encore confirmé",
+        description: "Ouvrez le lien reçu par email, puis réessayez.",
+        variant: "destructive",
+      });
+      return;
+    }
+    await syncAccountSession(data.session, "signup").catch(() => null);
+    setUserId(data.session.user.id);
+    setAwaitingConfirmation(false);
     setStep(2);
-    toast({ title: "Compte créé", description: "Téléversez maintenant vos pièces justificatives." });
+    toast({ title: "Email confirmé", description: "Téléversez vos pièces justificatives pour finaliser." });
+  };
+
+  const resendConfirmation = async () => {
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email: form.email.trim().toLowerCase(),
+      options: { emailRedirectTo: `${window.location.origin}/auth/provider?resume=1` },
+    });
+    toast(
+      error
+        ? { title: "Envoi impossible", description: friendlyAuthError(error), variant: "destructive" }
+        : { title: "Email renvoyé", description: `Nouveau lien envoyé à ${form.email}.` },
+    );
   };
 
   // ============== Submit application ==============
@@ -283,6 +478,7 @@ const ProviderSignup = () => {
     }
 
     setSubmitting(false);
+    clearDraft();
     toast({
       title: "Compte créé et dossier transmis",
       description: "Vous pouvez vous reconnecter pendant l’étude de votre demande.",
@@ -291,6 +487,30 @@ const ProviderSignup = () => {
   };
 
   const inputCls = "w-full bg-transparent border-0 outline-none text-ink text-[15px] placeholder:text-ink-4";
+
+  if (resolvingResume) {
+    return (
+      <AuthShell backTo="/auth" backLabel="Espace patient">
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" strokeWidth={2.4} />
+          <p className="mt-4 text-[14px] text-ink-3">Reprise de votre inscription…</p>
+        </div>
+      </AuthShell>
+    );
+  }
+
+  if (awaitingConfirmation) {
+    return (
+      <AuthShell backTo="/auth" backLabel="Espace patient">
+        <AwaitConfirmation
+          email={form.email}
+          submitting={submitting}
+          onRetry={retryAfterConfirmation}
+          onResend={resendConfirmation}
+        />
+      </AuthShell>
+    );
+  }
 
   return (
     <AuthShell backTo="/auth" backLabel="Espace patient">
@@ -548,7 +768,7 @@ const ProviderSignup = () => {
                 </div>
                 <div>
                   <p className="text-[14.5px] font-semibold text-ink">Documents chiffrés</p>
-                  <p className="text-[12.5px] text-ink-3 mt-0.5">PDF, JPG ou PNG — 5 Mo maximum par fichier.</p>
+                  <p className="text-[12.5px] text-ink-3 mt-0.5">Tous formats acceptés — 20 Mo maximum par fichier.</p>
                 </div>
               </div>
 
@@ -583,7 +803,7 @@ const ProviderSignup = () => {
                     <DocumentUpload label="Carte Nationale d'Identité (CNI)" required userId={userId} field="cni"
                       value={docs.document_cni_url} onChange={updateDoc("document_cni_url")} />
                     <DocumentUpload label="Curriculum Vitae (CV)" required userId={userId} field="cv"
-                      value={docs.document_cv_url} onChange={updateDoc("document_cv_url")} accept="application/pdf" />
+                      value={docs.document_cv_url} onChange={updateDoc("document_cv_url")} />
                     <DocumentUpload label="Diplôme" required userId={userId} field="diploma"
                       value={docs.document_diploma_url} onChange={updateDoc("document_diploma_url")} />
                     {(type === "doctor" || type === "dentist" || type === "pharmacist" || type === "midwife") && (
@@ -649,6 +869,60 @@ const FieldBox = ({ label, children }: { label: string; children: React.ReactNod
     <p className="text-[9.5px] sm:text-[10.5px] font-mono uppercase tracking-[0.08em] sm:tracking-widest text-ink-3 mb-0.5">{label}</p>
     {children}
   </label>
+);
+
+const AwaitConfirmation = ({
+  email,
+  submitting,
+  onRetry,
+  onResend,
+}: {
+  email: string;
+  submitting: boolean;
+  onRetry: () => void;
+  onResend: () => void;
+}) => (
+  <motion.div
+    initial={{ opacity: 0, y: 14 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+    className="max-w-md mx-auto text-center py-8"
+  >
+    <div className="size-14 squircle bg-primary-soft flex items-center justify-center mx-auto mb-6">
+      <MailCheck className="h-7 w-7 text-primary" strokeWidth={2.2} />
+    </div>
+    <p className="text-[10.5px] font-mono uppercase tracking-[0.14em] text-primary mb-3">Compte créé</p>
+    <h1 className="font-display text-2xl sm:text-3xl leading-[1.08] text-ink text-balance">
+      Confirmez votre email pour continuer.
+    </h1>
+    <p className="text-[14.5px] text-ink-3 mt-3 leading-relaxed">
+      Nous avons envoyé un lien de confirmation à{" "}
+      <span className="text-ink font-medium">{email}</span>. Ouvrez-le, puis revenez ici :
+      vous reprendrez directement au téléversement de vos documents, sans ressaisir vos informations.
+    </p>
+
+    <button
+      onClick={onRetry}
+      disabled={submitting}
+      className="btn-pill w-full h-12 bg-ink text-white text-[15px] font-semibold mt-7 shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all ease-spring disabled:opacity-50"
+    >
+      {submitting ? "Vérification…" : "J'ai confirmé mon email"}
+      {!submitting && <ArrowRight className="h-4 w-4" strokeWidth={2.5} />}
+    </button>
+
+    <button
+      onClick={onResend}
+      disabled={submitting}
+      className="mt-3 inline-flex items-center gap-2 text-[13px] font-semibold text-ink-3 hover:text-ink tap disabled:opacity-50"
+    >
+      <RefreshCw className="h-3.5 w-3.5" strokeWidth={2.4} />
+      Renvoyer l'email de confirmation
+    </button>
+
+    <p className="text-[12px] text-ink-4 mt-6 leading-relaxed">
+      Pensez à vérifier vos courriers indésirables. Le lien reste valable plusieurs heures.
+    </p>
+  </motion.div>
 );
 
 export default ProviderSignup;
