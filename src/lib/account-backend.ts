@@ -18,10 +18,33 @@ interface AccountSyncResponse {
   welcomeMessage: string | null;
 }
 
+/** Raised when the durable-account service is not reachable at all. */
+export class AccountBackendUnavailableError extends Error {
+  constructor() {
+    super("Account backend unavailable");
+    this.name = "AccountBackendUnavailableError";
+  }
+}
+
+// The durable-account service (server/index.mjs) only runs alongside local dev,
+// where Vite proxies /api to it. Static hosting has no such route: every path
+// falls through to the SPA shell, so /api/account/sync answers 405 and
+// /api/account/me answers 200 text/html. Probing it on every auth state change
+// would fire a request that can never succeed, so the first clear "not deployed"
+// answer latches this off for the rest of the page session.
+let backendReachable: boolean | null = null;
+
+const looksUndeployed = (response: Response) =>
+  response.status === 404 ||
+  response.status === 405 ||
+  !(response.headers.get("content-type") ?? "").includes("application/json");
+
 export const syncAccountSession = async (
   session: Session,
   eventType: AccountEventType = "session",
 ): Promise<AccountSyncResponse> => {
+  if (backendReachable === false) throw new AccountBackendUnavailableError();
+
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), 7000);
 
@@ -37,7 +60,13 @@ export const syncAccountSession = async (
       signal: controller.signal,
     });
 
+    if (looksUndeployed(response)) {
+      backendReachable = false;
+      throw new AccountBackendUnavailableError();
+    }
     if (!response.ok) throw new Error("Account sync failed");
+
+    backendReachable = true;
     return await response.json() as AccountSyncResponse;
   } finally {
     window.clearTimeout(timeout);
