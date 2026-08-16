@@ -18,6 +18,7 @@ import {
 import { cn } from "@/lib/utils";
 import AuthShell from "@/components/AuthShell";
 import { friendlyAuthError, syncAccountSession } from "@/lib/account-backend";
+import { attachDocumentsToApplication } from "@/lib/provider-documents";
 import { securePasswordSchema } from "@/lib/auth-validation";
 
 // Draft persistence — lets a professional resume document upload after
@@ -440,12 +441,22 @@ const ProviderSignup = () => {
       ...docs,
     };
 
-    const { error: appError } = await supabase.from("provider_applications").insert(appPayload);
+    const { data: application, error: appError } = await supabase
+      .from("provider_applications")
+      .insert(appPayload)
+      .select("id")
+      .single();
 
     if (appError) {
       setSubmitting(false);
       toast({ title: "Erreur", description: appError.message, variant: "destructive" });
       return;
+    }
+
+    // The pieces were deposited before this application existed; bind them to it
+    // now so the reviewer sees the dossier and its documents as one whole.
+    if (application?.id) {
+      await attachDocumentsToApplication(application.id).catch(() => null);
     }
 
     // If structure, create row in health_structures (unverified)

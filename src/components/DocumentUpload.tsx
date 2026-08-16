@@ -1,30 +1,30 @@
 import { useState } from "react";
 import { Loader2, X } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import {
+  archiveProviderDocument,
+  depositProviderDocument,
+  DocumentTooLargeError,
+  MAX_DOCUMENT_BYTES,
+  type DocumentCategory,
+} from "@/lib/provider-documents";
 
 interface DocumentUploadProps {
   label: string;
   description?: string;
   required?: boolean;
   userId: string;
-  field: string;
+  /** Document category — also used as the storage key prefix. */
+  field: DocumentCategory | string;
   value: string | null;
   onChange: (path: string | null) => void;
+  /** Reports the registered metadata row, so the parent can link it later. */
+  onRegistered?: (documentId: string | null) => void;
   /** Optional MIME/extension filter. Omitted by default: any file is accepted —
    *  the platform only stores the piece; a human reviewer judges its content. */
   accept?: string;
 }
-
-const MAX_SIZE = 20 * 1024 * 1024;
-
-// Keep only characters that are safe inside a Supabase Storage object key.
-const safeExt = (name: string) => {
-  const dot = name.lastIndexOf(".");
-  if (dot < 0 || dot === name.length - 1) return "bin";
-  return name.slice(dot + 1).toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 12) || "bin";
-};
 
 const DocumentUpload = ({
   label,
@@ -34,39 +34,60 @@ const DocumentUpload = ({
   field,
   value,
   onChange,
+  onRegistered,
   accept,
 }: DocumentUploadProps) => {
   const [uploading, setUploading] = useState(false);
+  const [documentId, setDocumentId] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState<string | null>(null);
 
   const handle = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > MAX_SIZE) {
-      toast({ title: "Fichier trop volumineux", description: "Maximum 20 Mo.", variant: "destructive" });
-      return;
-    }
+
     setUploading(true);
-    const path = `${userId}/${field}-${Date.now()}.${safeExt(file.name)}`;
-    const { error } = await supabase.storage.from("provider-documents").upload(path, file, {
-      upsert: true,
-      contentType: file.type || "application/octet-stream",
-    });
-    setUploading(false);
-    if (error) {
-      toast({ title: "Échec de l'envoi", description: error.message, variant: "destructive" });
-      return;
+    try {
+      const result = await depositProviderDocument({
+        file,
+        userId,
+        category: field as DocumentCategory,
+        label,
+        // Supersede the previous deposit so the history is kept, not overwritten.
+        replacesDocumentId: documentId,
+      });
+      setDocumentId(result.documentId);
+      setDisplayName(file.name);
+      onChange(result.path);
+      onRegistered?.(result.documentId);
+      toast({ title: "Document enregistré" });
+    } catch (error) {
+      const description = error instanceof DocumentTooLargeError
+        ? `Maximum ${Math.round(MAX_DOCUMENT_BYTES / (1024 * 1024))} Mo.`
+        : error instanceof Error ? error.message : "Réessayez dans un instant.";
+      toast({ title: "Échec de l'envoi", description, variant: "destructive" });
+    } finally {
+      setUploading(false);
+      // Let the same file be picked again after a failure.
+      e.target.value = "";
     }
-    onChange(path);
-    toast({ title: "Document enregistré" });
   };
 
   const remove = async () => {
     if (!value) return;
-    await supabase.storage.from("provider-documents").remove([value]);
+    if (documentId) {
+      try {
+        await archiveProviderDocument(documentId);
+      } catch {
+        /* archiving is best-effort: the applicant must still be able to move on */
+      }
+    }
+    setDocumentId(null);
+    setDisplayName(null);
     onChange(null);
+    onRegistered?.(null);
   };
 
-  const filename = value?.split("/").pop();
+  const filename = displayName ?? value?.split("/").pop();
 
   return (
     <div>

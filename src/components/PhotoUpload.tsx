@@ -3,6 +3,12 @@ import { Loader2, Camera, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import {
+  archiveProviderDocument,
+  depositProviderDocument,
+  DocumentTooLargeError,
+  type DocumentCategory,
+} from "@/lib/provider-documents";
 
 interface PhotoUploadProps {
   label: string;
@@ -14,8 +20,6 @@ interface PhotoUploadProps {
   shape?: "circle" | "square";
 }
 
-const MAX_SIZE = 3 * 1024 * 1024;
-
 const PhotoUpload = ({
   label,
   required,
@@ -26,6 +30,7 @@ const PhotoUpload = ({
   shape = "circle",
 }: PhotoUploadProps) => {
   const [uploading, setUploading] = useState(false);
+  const [documentId, setDocumentId] = useState<string | null>(null);
 
   const publicUrl = value
     ? supabase.storage.from("public-profiles").getPublicUrl(value).data.publicUrl
@@ -34,29 +39,46 @@ const PhotoUpload = ({
   const handle = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    // A portrait really does have to be an image — this is a form check on the
+    // file itself, not a judgement on what the picture shows.
     if (!file.type.startsWith("image/")) {
       toast({ title: "Fichier invalide", description: "Image uniquement (JPG/PNG/WebP).", variant: "destructive" });
       return;
     }
-    if (file.size > MAX_SIZE) {
-      toast({ title: "Trop volumineux", description: "Maximum 3 Mo.", variant: "destructive" });
-      return;
-    }
+
     setUploading(true);
-    const ext = file.name.split(".").pop();
-    const path = `${userId}/${field}-${Date.now()}.${ext}`;
-    const { error } = await supabase.storage.from("public-profiles").upload(path, file, { upsert: true });
-    setUploading(false);
-    if (error) {
-      toast({ title: "Échec", description: error.message, variant: "destructive" });
-      return;
+    try {
+      const result = await depositProviderDocument({
+        file,
+        userId,
+        category: field as DocumentCategory,
+        bucket: "public-profiles",
+        label,
+        replacesDocumentId: documentId,
+      });
+      setDocumentId(result.documentId);
+      onChange(result.path);
+    } catch (error) {
+      const description = error instanceof DocumentTooLargeError
+        ? "Maximum 20 Mo."
+        : error instanceof Error ? error.message : "Réessayez dans un instant.";
+      toast({ title: "Échec", description, variant: "destructive" });
+    } finally {
+      setUploading(false);
+      e.target.value = "";
     }
-    onChange(path);
   };
 
   const remove = async () => {
     if (!value) return;
-    await supabase.storage.from("public-profiles").remove([value]);
+    if (documentId) {
+      try {
+        await archiveProviderDocument(documentId);
+      } catch {
+        /* best-effort archive */
+      }
+    }
+    setDocumentId(null);
     onChange(null);
   };
 
@@ -88,7 +110,7 @@ const PhotoUpload = ({
             </button>
           ) : (
             <p className="text-[12.5px] text-ink-3 leading-relaxed">
-              JPG, PNG ou WebP — 3 Mo max.
+              JPG, PNG ou WebP — 20 Mo max.
               <br />
               <span className="text-ink-4">Photo professionnelle nette, fond neutre.</span>
             </p>
