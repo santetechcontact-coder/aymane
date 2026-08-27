@@ -64,7 +64,7 @@ describe("depositProviderDocument", () => {
   });
 
   it("removes the stored file when its metadata cannot be registered", async () => {
-    rpc.mockResolvedValue({ data: null, error: new Error("rls denied") });
+    rpc.mockResolvedValue({ data: null, error: { message: "rls denied", code: "42501" } });
 
     await expect(depositProviderDocument({
       file: fileOf(1024), userId: "user-1", category: "cni",
@@ -72,6 +72,25 @@ describe("depositProviderDocument", () => {
 
     // No orphan binary must be left behind.
     expect(remove).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the deposit when the metadata subsystem is not deployed yet", async () => {
+    rpc.mockResolvedValue({
+      data: null,
+      error: {
+        code: "PGRST202",
+        message: "Could not find the function public.register_provider_document in the schema cache",
+      },
+    });
+
+    const result = await depositProviderDocument({
+      file: fileOf(1024), userId: "user-1", category: "cni",
+    });
+
+    // The applicant's file survives; only its metadata row is postponed.
+    expect(result.path).toMatch(/^user-1\/cni-\d+\./);
+    expect(result.documentId).toBeNull();
+    expect(remove).not.toHaveBeenCalled();
   });
 
   it("keeps history by declaring the document it supersedes", async () => {

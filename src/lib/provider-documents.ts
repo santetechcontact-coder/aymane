@@ -37,7 +37,8 @@ export interface ProviderDocument {
 }
 
 export interface DepositResult {
-  documentId: string;
+  /** Null when the metadata backend is not deployed yet — the file is still stored. */
+  documentId: string | null;
   path: string;
 }
 
@@ -78,11 +79,31 @@ const callRpc = async <T>(fn: string, args: Record<string, unknown>): Promise<T>
   const invoke = supabase.rpc as unknown as (
     name: string,
     params: Record<string, unknown>,
-  ) => Promise<{ data: T; error: { message: string } | null }>;
+  ) => Promise<{ data: T; error: { message: string; code?: string } | null }>;
 
   const { data, error } = await invoke(fn, args);
-  if (error) throw new Error(error.message);
+  if (error) {
+    const failure = new Error(error.message) as Error & { code?: string };
+    failure.code = error.code;
+    throw failure;
+  }
   return data;
+};
+
+/**
+ * True when the database simply does not expose this function yet — the
+ * migration that ships the document subsystem has not been applied. PostgREST
+ * answers PGRST202 ("Could not find the function ... in the schema cache").
+ *
+ * A deposit must never be lost over this: the file itself is stored and a
+ * reviewer can already open it. Metadata starts being recorded the moment the
+ * migration lands, with no code change.
+ */
+const isSubsystemNotDeployed = (error: unknown) => {
+  const code = (error as { code?: string } | null)?.code;
+  if (code === "PGRST202") return true;
+  const message = error instanceof Error ? error.message.toLowerCase() : "";
+  return message.includes("could not find the function") || message.includes("schema cache");
 };
 
 /**
@@ -133,7 +154,12 @@ export const depositProviderDocument = async (options: {
     });
     return { documentId, path };
   } catch (error) {
-    // Never leave an orphan binary behind when its metadata could not be stored.
+    // The subsystem not being deployed is our problem, not the applicant's:
+    // keep the file they just deposited and let them carry on.
+    if (isSubsystemNotDeployed(error)) return { documentId: null, path };
+
+    // Any other failure means the deposit is not usable — do not leave an
+    // orphan binary behind with no record of who it belongs to.
     await supabase.storage.from(bucket).remove([path]);
     throw error;
   }
@@ -141,7 +167,11 @@ export const depositProviderDocument = async (options: {
 
 /** Archive a document (soft delete — the file is retained for traceability). */
 export const archiveProviderDocument = async (documentId: string) => {
-  await callRpc<void>("archive_provider_document", { _document_id: documentId });
+  try {
+    await callRpc<void>("archive_provider_document", { _document_id: documentId });
+  } catch (error) {
+    if (!isSubsystemNotDeployed(error)) throw error;
+  }
 };
 
 /** Record that someone opened or downloaded a document. */
