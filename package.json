@@ -14,7 +14,10 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "db:health": "node scripts/db-health.mjs",
+    "db:audit": "node scripts/db-audit.mjs",
+    "db:bootstrap": "node scripts/db-bootstrap.mjs"
   },
   "dependencies": {
     "@fontsource-variable/jetbrains-mono": "^5.2.8",
