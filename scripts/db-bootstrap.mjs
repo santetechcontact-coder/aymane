@@ -55,13 +55,22 @@ for (const file of files) {
   if (done.has(file)) { skipped++; console.log(`⏭️  déjà appliquée  ${file}`); continue; }
 
   const sql = readFileSync(path.join(migDir, file), "utf8");
+
+  // Postgres refuses to use an enum value that was added in the same
+  // transaction, so a migration that extends a type has to run in autocommit.
+  const extendsAnEnum = /ALTER\s+TYPE[\s\S]*?ADD\s+VALUE/i.test(sql);
+
   try {
-    await client.query("BEGIN");
-    await client.query(sql);
+    if (extendsAnEnum) {
+      await client.query(sql);
+    } else {
+      await client.query("BEGIN");
+      await client.query(sql);
+      await client.query("COMMIT");
+    }
     await client.query("INSERT INTO public._aymane_migrations(name) VALUES ($1) ON CONFLICT DO NOTHING", [file]);
-    await client.query("COMMIT");
     applied++;
-    console.log(`✅ appliquée      ${file}`);
+    console.log(`✅ appliquée      ${file}${extendsAnEnum ? "  (hors transaction)" : ""}`);
   } catch (error) {
     try { await client.query("ROLLBACK"); } catch { /* */ }
     console.error(`\n❌ ÉCHEC sur ${file}`);
