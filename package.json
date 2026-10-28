@@ -18,7 +18,8 @@
     "db:health": "node scripts/db-health.mjs",
     "db:audit": "node scripts/db-audit.mjs",
     "db:bootstrap": "node scripts/db-bootstrap.mjs",
-    "db:setkey": "node scripts/db-setkey.mjs"
+    "db:setkey": "node scripts/db-setkey.mjs",
+    "db:bundle": "node scripts/db-bundle.mjs"
   },
   "dependencies": {
     "@fontsource-variable/jetbrains-mono": "^5.2.8",
