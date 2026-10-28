@@ -17,7 +17,9 @@ export type DirectoryStructure = {
   source_url: string;
 };
 
-type PublicStructureRow = readonly [name: string, type: string, city?: string];
+// Region defaults to Dakar, which is where the bulk of the catalogue sits; the
+// regional hospitals at the end of the list carry their own.
+type PublicStructureRow = readonly [name: string, type: string, city?: string, region?: string];
 
 const PUBLIC_STRUCTURE_ROWS: readonly PublicStructureRow[] = [
   ["Pharmacie de l'Aeroport", "pharmacy", "Yoff"],
@@ -130,6 +132,34 @@ const PUBLIC_STRUCTURE_ROWS: readonly PublicStructureRow[] = [
   ["PS Niague", "other", "Niague"],
   ["PS Niacoul Rab", "other", "Rufisque"],
   ["PS Nguinaw Rail Sud", "other", "Pikine"],
+
+  // --- Officines de Dakar ---------------------------------------------------
+  ["Pharmacie Guigon", "pharmacy", "Dakar-Plateau"],
+  ["Pharmacie du Point E", "pharmacy", "Point E"],
+  ["Pharmacie Mermoz", "pharmacy", "Mermoz"],
+  ["Pharmacie Sacre-Coeur", "pharmacy", "Sacre-Coeur"],
+  ["Pharmacie de la Patte d'Oie", "pharmacy", "Patte d'Oie"],
+  ["Pharmacie des Parcelles Assainies", "pharmacy", "Parcelles Assainies"],
+  ["Pharmacie de Ouakam", "pharmacy", "Ouakam"],
+  ["Pharmacie de Grand-Yoff", "pharmacy", "Grand-Yoff"],
+
+  // --- Hopitaux regionaux et nationaux hors Dakar ----------------------------
+  ["Hopital Regional El Hadji Ahmadou Sakhir Ndieguene", "hospital", "Thies", "Thies"],
+  ["Hopital Saint Jean de Dieu", "hospital", "Thies", "Thies"],
+  ["Hopital Grand Mbour", "hospital", "Mbour", "Thies"],
+  ["Hopital Regional de Saint-Louis", "hospital", "Saint-Louis", "Saint-Louis"],
+  ["Hopital de la Paix", "hospital", "Ziguinchor", "Ziguinchor"],
+  ["Hopital Regional El Hadji Ibrahima Niasse", "hospital", "Kaolack", "Kaolack"],
+  ["Hopital Regional de Tambacounda", "hospital", "Tambacounda", "Tambacounda"],
+  ["Hopital Regional Amadou Sakhir Mbaye", "hospital", "Louga", "Louga"],
+  ["Hopital Regional Heinrich Lubke", "hospital", "Diourbel", "Diourbel"],
+  ["Hopital Matlaboul Fawzeyni", "hospital", "Touba", "Diourbel"],
+  ["Hopital Ndamatou", "hospital", "Touba", "Diourbel"],
+  ["Hopital Regional de Kolda", "hospital", "Kolda", "Kolda"],
+  ["Hopital Regional de Fatick", "hospital", "Fatick", "Fatick"],
+  ["Hopital Regional de Matam", "hospital", "Matam", "Matam"],
+  ["Hopital Regional de Sedhiou", "hospital", "Sedhiou", "Sedhiou"],
+  ["Hopital Regional Amath Dansokho", "hospital", "Kedougou", "Kedougou"],
 ] as const;
 
 const normalize = (value: string) =>
@@ -140,13 +170,17 @@ const normalize = (value: string) =>
     .trim()
     .toLowerCase();
 
-export const publicHealthStructures: DirectoryStructure[] = PUBLIC_STRUCTURE_ROWS.map(([name, type, city], index) => ({
+export const publicHealthStructures: DirectoryStructure[] = PUBLIC_STRUCTURE_ROWS.map(([name, type, city, region], index) => {
+  const structureRegion = region ?? "Dakar";
+  const structureCity = city ?? structureRegion;
+
+  return {
   id: `public-santemap-dakar-${String(index + 1).padStart(3, "0")}`,
   name,
   type,
-  city: city ?? "Dakar",
-  region: "Dakar",
-  address: city && city !== "Dakar" ? `${city}, region de Dakar` : "Region de Dakar",
+  city: structureCity,
+  region: structureRegion,
+  address: structureCity !== structureRegion ? `${structureCity}, region de ${structureRegion}` : `Region de ${structureRegion}`,
   phone_landline: "",
   phone_mobile: "",
   email: "",
@@ -155,7 +189,8 @@ export const publicHealthStructures: DirectoryStructure[] = PUBLIC_STRUCTURE_ROW
   source: "public_reference",
   source_name: "SanteMap",
   source_url: "https://santemap.com/",
-}));
+  };
+});
 
 export const mergeDirectoryStructures = (
   partnerStructures: DirectoryStructure[],

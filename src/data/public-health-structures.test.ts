@@ -37,6 +37,32 @@ describe("public health directory", () => {
     expect(duplicate[0].source).toBe("aymane_partner");
   });
 
+  it("reaches beyond Dakar with regional hospitals that keep their own region", () => {
+    const outsideDakar = publicHealthStructures.filter((item) => item.region !== "Dakar");
+
+    expect(outsideDakar.length).toBeGreaterThanOrEqual(15);
+    expect(new Set(outsideDakar.map((item) => item.region)).size).toBeGreaterThanOrEqual(10);
+    expect(outsideDakar.every((item) => item.type === "hospital")).toBe(true);
+
+    const thies = publicHealthStructures.find((item) => item.city === "Thies");
+    expect(thies?.region).toBe("Thies");
+    expect(thies?.address).toBe("Region de Thies");
+  });
+
+  it("spells out the locality when it differs from the region", () => {
+    const touba = publicHealthStructures.find((item) => item.city === "Touba");
+
+    expect(touba?.region).toBe("Diourbel");
+    expect(touba?.address).toBe("Touba, region de Diourbel");
+  });
+
+  it("lists enough pharmacies to be worth searching", () => {
+    const pharmacies = publicHealthStructures.filter((item) => item.type === "pharmacy");
+
+    expect(pharmacies.length).toBeGreaterThanOrEqual(10);
+    expect(pharmacies.some((item) => matchesDirectorySearch(item, "pharmacie"))).toBe(true);
+  });
+
   it("creates an encoded directions link", () => {
     const url = structureDirectionsUrl(publicHealthStructures[0]);
 
