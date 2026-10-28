@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useLandingOperations } from "@/hooks/useLandingOperations";
 import { cn } from "@/lib/utils";
+import { PRICE_UNSET_LABEL, formatMedicationPrice, isPriceSet } from "@/lib/medication-pricing";
 
 const typeLabels: Record<string, string> = {
   hospital: "Hôpital",
@@ -179,7 +180,9 @@ const LiveOperations = () => {
                             {item.requires_prescription ? "Ordonnance requise" : "Sans ordonnance"} - stock {item.stock}
                           </p>
                         </div>
-                        <p className="font-display text-lg tabular text-ink shrink-0">{Number(item.price).toLocaleString("fr-SN")} F</p>
+                        <p className={cn("shrink-0 tabular", isPriceSet(item.price) ? "font-display text-lg text-ink" : "text-[11.5px] font-semibold text-ink-3")}>
+                          {isPriceSet(item.price) ? formatMedicationPrice(item.price, "F") : PRICE_UNSET_LABEL}
+                        </p>
                       </div>
                     ))}
                   </div>

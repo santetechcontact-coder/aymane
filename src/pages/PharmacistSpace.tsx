@@ -16,6 +16,7 @@ import {
   Package, Plus, Search, AlertTriangle, Pill, TrendingUp, ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatMedicationAmount, isPriceSet } from "@/lib/medication-pricing";
 
 type Med = {
   id: string;
@@ -260,7 +261,13 @@ const PharmacistSpace = () => {
                 {m.description && <p className="text-[12.5px] text-ink-3 mt-2 line-clamp-2">{m.description}</p>}
                 <div className="flex items-center justify-between mt-4 pt-3 border-t border-hairline">
                   <span className="font-display text-[17px] tabular text-ink">
-                    {Number(m.price).toLocaleString("fr-FR")} <span className="text-[11px] text-ink-3 font-sans">FCFA</span>
+                    {isPriceSet(m.price) ? (
+                      <>
+                        {formatMedicationAmount(m.price)} <span className="text-[11px] text-ink-3 font-sans">FCFA</span>
+                      </>
+                    ) : (
+                      <span className="text-[12.5px] font-sans font-semibold text-accent">Prix a definir</span>
+                    )}
                   </span>
                   <span className="text-[12px] text-ink-3 tabular">
                     Stock <span className="font-semibold text-ink-2">{m.stock}</span>

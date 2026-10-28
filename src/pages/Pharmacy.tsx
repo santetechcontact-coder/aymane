@@ -19,6 +19,13 @@ import {
   isValidPaymentPhone,
   normalizePaymentPhone,
 } from "@/lib/local-payments";
+import {
+  PRICE_UNSET_LABEL,
+  formatMedicationAmount,
+  formatMedicationPrice,
+  isPriceSet,
+  summariseCartPricing,
+} from "@/lib/medication-pricing";
 
 type Medication = {
   id: string;
@@ -141,10 +148,12 @@ const Pharmacy = () => {
     [cart, medications],
   );
 
-  const total = useMemo(
-    () => cartItems.reduce((sum, item) => sum + Number(item.medication.price) * item.quantity, 0),
+  // Unpriced molecules are left out of the total instead of counted as free.
+  const pricing = useMemo(
+    () => summariseCartPricing(cartItems.map((item) => ({ price: item.medication.price, quantity: item.quantity }))),
     [cartItems],
   );
+  const total = pricing.total;
   const cartCount = useMemo(
     () => cartItems.reduce((sum, item) => sum + item.quantity, 0),
     [cartItems],
@@ -242,7 +251,9 @@ const Pharmacy = () => {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[13.5px] font-semibold text-ink">{medication.name}</p>
                   <p className="mt-1 text-[11px] tabular-nums text-ink-3">
-                    {Number(medication.price).toLocaleString("fr-SN")} FCFA l'unité
+                    {isPriceSet(medication.price)
+                      ? `${formatMedicationPrice(medication.price)} l'unité`
+                      : PRICE_UNSET_LABEL}
                   </p>
                 </div>
                 <QuantityControl
@@ -264,6 +275,14 @@ const Pharmacy = () => {
               {formatFCFA(total)}
             </span>
           </div>
+
+          {pricing.isPartial ? (
+            <p className="-mt-2 text-[11px] leading-relaxed text-ink-3">
+              {pricing.unpricedUnits === 1
+                ? "1 article sera chiffré par l'officine : il n'entre pas dans ce montant."
+                : `${pricing.unpricedUnits} articles seront chiffrés par l'officine : ils n'entrent pas dans ce montant.`}
+            </p>
+          ) : null}
 
           {user ? (
             <div className="space-y-3 rounded-[0.9rem] border border-hairline bg-surface-1 p-3">
@@ -460,10 +479,18 @@ const Pharmacy = () => {
 
                       <div className="mt-4 flex items-end justify-between gap-3 md:mt-0 md:block md:text-right">
                         <div>
-                          <p className="font-display text-[20px] tabular-nums text-ink">
-                            {Number(medication.price).toLocaleString("fr-SN")}
-                          </p>
-                          <p className="text-[10px] font-semibold text-ink-4">FCFA</p>
+                          {isPriceSet(medication.price) ? (
+                            <>
+                              <p className="font-display text-[20px] tabular-nums text-ink">
+                                {formatMedicationAmount(medication.price)}
+                              </p>
+                              <p className="text-[10px] font-semibold text-ink-4">FCFA</p>
+                            </>
+                          ) : (
+                            <p className="text-[11.5px] font-semibold leading-tight text-ink-3">
+                              {PRICE_UNSET_LABEL}
+                            </p>
+                          )}
                         </div>
                         <StockLabel stock={medication.stock} className="hidden md:inline-flex" />
                       </div>
